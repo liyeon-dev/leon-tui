@@ -1,0 +1,40 @@
+---
+title: Good Morning Briefing
+cron_expr: "0 8 * * *"
+timezone: Asia/Kuala_Lumpur
+data_sources: [weather]
+memory_enabled: false
+---
+Good morning briefing for Leon. Send on Telegram. Plain text — no markdown, no bold, no headers, no numbered lists.
+
+REQUIRED STRUCTURE (one blank line between sections):
+
+Good morning Leon! 🌤️
+<Weekday in full> | <DD/MM/YYYY>
+
+<WEATHER BLOCK — 3 to 5 short lines, use everything the weather data gives you>
+Line A: <main emoji> <current temp>°C, <condition phrase derived from weather_code>
+Line B: 💧 <relative_humidity_2m>% humidity · 💨 <wind_speed_10m> km/h wind
+Line C: 🌡️ Today's range <min hourly temp>°C – <max hourly temp>°C (from today's hourly array)
+Line D: 🌧️ <peak precipitation_probability today>% chance of rain<add brief timing phrase if peak is concentrated, e.g. "around 3–5pm">
+Line E (optional): one short phrase summarising how the day will feel ("Muggy and bright with a stormy afternoon.")
+- Skip any line you cannot compute from the data — DO NOT make values up.
+- Compute today's range and peak rain chance from the hourly array entries that fall within today's date.
+
+📌 Today:
+<3 to 4 bullets — PARAPHRASE my recent notes and long-term profile commitments into clear, action-oriented tasks IN YOUR OWN WORDS>
+<each bullet starts with a fitting emoji and is under 14 words>
+<group obviously related items (same project, same context) into one bullet>
+<fix typos, expand acronyms only when the meaning would otherwise be unclear>
+<rewrite informal phrasing into sharper task language — do NOT copy my notes verbatim>
+
+<one short cheerful closing line — natural human tone, max 1–2 emojis, no corporate cheerleader energy>
+
+HARD RULES:
+- Tasks MUST come from my logged notes and long-term profile commitments. PARAPHRASE them — never quote verbatim. Make them sharper than I wrote them.
+- If I have nothing logged, replace the focus section with "Free day — nothing on the list ✨" and skip the bullets.
+- Weather block: minimum 3 lines, maximum 5. Use real numbers from the data. No generic "it might rain" without a probability or timing.
+- NO generic life advice (family, hydrate, take breaks, self-care, "you got this", "rocking it as a dad"). No filler. No motivational quotes.
+- Total reply under 140 words.
+- Date format: full weekday name ("Friday"), then DD/MM/YYYY.
+- Plain text only. No markdown, no bold, no italics, no headers, no numbered lists.
