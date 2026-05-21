@@ -1,25 +1,36 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { Menu, type MenuItem } from "../components/Menu.js";
-import type { Job, LogEntry } from "../types.js";
+import type { Job, LogEntry, Task } from "../types.js";
 
-type HomeChoice = "chat" | "automations";
+type HomeChoice = "chat" | "automations" | "tasks";
 
 type Props = {
   jobs: Job[];
+  tasks: Task[];
   activity: LogEntry[];
   activeTimers: number;
   onPick: (choice: HomeChoice) => void;
 };
 
-export function Home({ jobs, activity, activeTimers, onPick }: Props) {
+export function Home({ jobs, tasks, activity, activeTimers, onPick }: Props) {
   const enabled = jobs.filter((j) => j.enabled).length;
+  const openTasks = tasks.filter((t) => t.status !== "completed").length;
+  const now = Date.now();
+  const overdueTasks = tasks.filter(
+    (t) => t.status !== "completed" && t.due_date !== undefined && t.due_date < now,
+  ).length;
 
   const items: MenuItem<HomeChoice>[] = [
     {
       key: "chat",
       label: "💬  Chat with DeepSeek",
       hint: "Resume or start a conversation",
+    },
+    {
+      key: "tasks",
+      label: "📋  Tasks",
+      hint: `${tasks.length} total · ${openTasks} open${overdueTasks > 0 ? ` · ${overdueTasks} overdue` : ""}`,
     },
     {
       key: "automations",

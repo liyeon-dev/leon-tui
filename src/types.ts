@@ -86,4 +86,53 @@ export type LogEntry = {
   message: string;
 };
 
-export type View = "home" | "chatList" | "chat" | "jobs" | "newjob" | "editjob";
+export type TaskStatus = "not_started" | "in_progress" | "on_hold" | "completed";
+
+export const TASK_STATUSES: TaskStatus[] = ["not_started", "in_progress", "on_hold", "completed"];
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  not_started: "Not Started",
+  in_progress: "In Progress",
+  on_hold: "On Hold",
+  completed: "Completed",
+};
+
+// Stages a reminder has progressed through. Used to dedupe Telegram pings.
+// Order: t-24h -> t-1h -> at due -> overdue (latter re-fires once per calendar day).
+export type ReminderStage = "h24" | "h1" | "due" | "overdue";
+
+export type TaskReminderState = {
+  enabled: boolean;
+  last_stage?: ReminderStage;
+  // For "overdue" we want one ping per day. Stored as YYYY-MM-DD of last overdue ping.
+  last_overdue_day?: string;
+};
+
+export type TaskCategory = {
+  name: string;
+  created_at: number;
+};
+
+export type Task = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;                 // category name (free text but typically from TaskCategory list)
+  status: TaskStatus;
+  due_date?: number;                // ms epoch; undefined = no due date
+  reminders: TaskReminderState;     // Auto Reminder toggle + dedupe state
+  created_at: number;
+  updated_at: number;
+};
+
+export type View =
+  | "home"
+  | "chatList"
+  | "chat"
+  | "jobs"
+  | "newjob"
+  | "editjob"
+  | "tasks"
+  | "newtask"
+  | "edittask"
+  | "categories";

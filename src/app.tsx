@@ -6,13 +6,19 @@ import { ChatList } from "./views/ChatList.js";
 import { Chat } from "./views/Chat.js";
 import { Jobs } from "./views/Jobs.js";
 import { NewJob } from "./views/NewJob.js";
+import { Tasks } from "./views/Tasks.js";
+import { TaskForm } from "./views/TaskForm.js";
+import { Categories } from "./views/Categories.js";
 import { loadSessions, saveSessions, createSession } from "./store/sessions.js";
 import { loadJobs, saveJobs } from "./store/jobs.js";
 import { loadSources, ensureDefaultSources } from "./store/sources.js";
+import { loadTasks, saveTasks } from "./store/tasks.js";
+import { loadCategories, saveCategories, ensureDefaultCategories, newCategory } from "./store/taskCategories.js";
 import { syncAll, register, unregister, activeCount, shutdown } from "./scheduler/runner.js";
 import { onActivity } from "./scheduler/execute.js";
 import { startPolling, stopPolling, onInbox } from "./services/telegram-poll.js";
-import type { Session, Job, View, LogEntry, DataSource } from "./types.js";
+import { startReminderScan, stopReminderScan } from "./scheduler/taskReminders.js";
+import type { Session, Job, View, LogEntry, DataSource, Task, TaskCategory } from "./types.js";
 
 const DEFAULT_TZ = process.env.LEON_TIMEZONE || "Asia/Kuala_Lumpur";
 
@@ -21,6 +27,8 @@ export function App() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [sources, setSources] = useState<DataSource[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [categories, setCategories] = useState<TaskCategory[]>([]);
   const [activity, setActivity] = useState<LogEntry[]>([]);
   const [timerCount, setTimerCount] = useState(0);
   // Gate the save effects until boot has populated state from disk —
@@ -33,6 +41,7 @@ export function App() {
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [editingJobId, setEditingJobId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
   function clearTerminal() {
     // \x1b[2J = clear screen, \x1b[3J = clear scrollback, \x1b[H = cursor home
@@ -53,12 +62,17 @@ export function App() {
     (async () => {
       try {
         await ensureDefaultSources().catch(() => undefined);
+        await ensureDefaultCategories().catch(() => undefined);
         const s = await loadSessions().catch(() => [] as Session[]);
         const j = await loadJobs().catch(() => [] as Job[]);
         const ds = await loadSources().catch(() => [] as DataSource[]);
+        const t = await loadTasks().catch(() => [] as Task[]);
+        const c = await loadCategories().catch(() => [] as TaskCategory[]);
         setSessions(s);
         setJobs(j);
         setSources(ds);
+        setTasks(t);
+        setCategories(c);
         syncAll(j);
         setTimerCount(activeCount());
         setLoaded(true);
@@ -80,11 +94,14 @@ export function App() {
       }]);
     });
     startPolling();
-    return () => { off(); offInbox(); stopPolling(); shutdown(); };
+    startReminderScan();
+    return () => { off(); offInbox(); stopPolling(); stopReminderScan(); shutdown(); };
   }, []);
 
   useEffect(() => { if (loaded) void saveSessions(sessions); }, [sessions, loaded]);
   useEffect(() => { if (loaded) void saveJobs(jobs); }, [jobs, loaded]);
+  useEffect(() => { if (loaded) void saveTasks(tasks); }, [tasks, loaded]);
+  useEffect(() => { if (loaded) void saveCategories(categories); }, [categories, loaded]);
 
   // Global keys: just quit + back
   useInput((input, key) => {
@@ -101,6 +118,7 @@ export function App() {
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const editingJob = jobs.find((j) => j.id === editingJobId) ?? null;
+  const editingTask = tasks.find((t) => t.id === editingTaskId) ?? null;
 
   function updateSession(next: Session) {
     setSessions((prev) => prev.map((s) => (s.id === next.id ? next : s)));
@@ -167,9 +185,45 @@ export function App() {
     push("newjob");
   }
 
-  function handleHomePick(choice: "chat" | "automations") {
+  function handleHomePick(choice: "chat" | "automations" | "tasks") {
     if (choice === "chat") push("chatList");
+    else if (choice === "tasks") push("tasks");
     else push("jobs");
+  }
+
+  function saveTask(task: Task) {
+    setTasks((prev) => {
+      const exists = prev.some((t) => t.id === task.id);
+      if (exists) return prev.map((t) => (t.id === task.id ? task : t));
+      return [...prev, task];
+    });
+    setEditingTaskId(null);
+    pop();
+  }
+
+  function deleteTask(id: string) {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function startEditTask(id: string) {
+    setEditingTaskId(id);
+    push("edittask");
+  }
+
+  function startNewTask() {
+    setEditingTaskId(null);
+    push("newtask");
+  }
+
+  function addCategory(name: string) {
+    setCategories((prev) => {
+      if (prev.some((c) => c.name.toLowerCase() === name.toLowerCase())) return prev;
+      return [...prev, newCategory(name)];
+    });
+  }
+
+  function deleteCategory(name: string) {
+    setCategories((prev) => prev.filter((c) => c.name !== name));
   }
 
   return (
@@ -178,7 +232,7 @@ export function App() {
 
       <Box flexDirection="column" paddingX={2} flexGrow={1}>
         {view === "home" && (
-          <Home jobs={jobs} activity={activity} activeTimers={timerCount} onPick={handleHomePick} />
+          <Home jobs={jobs} tasks={tasks} activity={activity} activeTimers={timerCount} onPick={handleHomePick} />
         )}
         {view === "chatList" && (
           <ChatList
@@ -211,6 +265,32 @@ export function App() {
         )}
         {view === "editjob" && !editingJob && (
           <Text color="red">Job not found. Press Esc to go back.</Text>
+        )}
+        {view === "tasks" && (
+          <Tasks
+            tasks={tasks}
+            onCreate={startNewTask}
+            onEdit={startEditTask}
+            onDelete={deleteTask}
+            onManageCategories={() => push("categories")}
+          />
+        )}
+        {view === "newtask" && (
+          <TaskForm categories={categories} onSave={saveTask} onCancel={pop} />
+        )}
+        {view === "edittask" && editingTask && (
+          <TaskForm categories={categories} existingTask={editingTask} onSave={saveTask} onCancel={pop} />
+        )}
+        {view === "edittask" && !editingTask && (
+          <Text color="red">Task not found. Press Esc to go back.</Text>
+        )}
+        {view === "categories" && (
+          <Categories
+            categories={categories}
+            onAdd={addCategory}
+            onDelete={deleteCategory}
+            onBack={pop}
+          />
         )}
       </Box>
 
